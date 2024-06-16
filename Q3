@@ -1,0 +1,98 @@
+from bs4 import BeautifulSoup
+import urllib.request
+import urllib
+import time
+import sys
+import re
+import math
+import os
+import random
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+
+def scroll_down(driver, percent):
+    driver.execute_script("window.scroll(0,document.body.scrollHeight*%d/100);"% percent)
+    time.sleep(1)
+
+chrome_options = Options()
+chrome_options.add_experimental_option("detach", True)
+driver = webdriver.Chrome(options=chrome_options)
+driver.implicitly_wait(3)
+
+s_time = time.time()
+
+driver.get("https://pixabay.com/ko/")
+time.sleep(2)
+
+print('='*100)
+print("Pixabay 사이트에서 이미지를 검색하여 수집하는 크롤러입니다.")
+print('='*100)
+
+keyword = input("1. 크롤링할 이미지의 키워드는 무엇입니까? ")
+cnt = int(input("2. 크롤링 할 건 수는 몇 건입니까? "))
+savefolder = input("3. 파일이 저장될 경로만 쓰세요 : ")
+
+if not os.path.exists(savefolder):
+        os.makedirs(savefolder)
+        print("폴더가 존재하지 않아 새로 생성하였습니다.")
+else:
+    print(f"입력하신 경로가 존재하여 {savefolder} 폴더에 저장하겠습니다.")
+    
+now = time.localtime()
+s = '%04d-%02d-%02d-%02d-%02d-%02d' % (now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+
+os.makedirs(savefolder+s+'-'+keyword)
+os.chdir(savefolder+s+'-'+keyword)
+f_result_dir = savefolder + s + '-'+keyword
+
+element = driver.find_element(By.NAME, 'search')
+element.send_keys(keyword)
+element.send_keys(Keys.ENTER)
+driver.implicitly_wait(3)
+time.sleep(5)
+
+file_no = 0
+
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
+for i in range(0, cnt):
+    
+    if i % 100 == 0:
+        scroll_down(driver,100)
+        element = driver.find_element(By.CLASS_NAME, 'pageInput--sZUNb')
+        element.clear()
+        element.send_keys(i//100+1)
+        element.send_keys(Keys.ENTER)
+        time.sleep(2)
+        
+    html = driver.page_source
+    soup = BeautifulSoup(html,'html.parser')
+    img_src = soup.find('div', 'results--mB75j').find_all('img')
+    
+    scroll_down(driver,i%25*4)
+    request = urllib.request.Request(img_src[i%100]['src'], headers=headers)
+    
+    try:
+        with urllib.request.urlopen(request) as response:
+            image_data = response.read()
+            
+            with open(f"{file_no}.jpg","wb") as file:
+                file.write(image_data)
+    
+
+    except urllib.error.HTTPError as e:
+        print(f"HTTP 오류 발생 : {e.code} - {e.reason}")
+        
+        
+    file_no +=1
+    time.sleep(0.5)
+    print("%s 번째 이미지 저장 중입니다.~~~" %file_no)
+    
+driver.close()
+        
+   
